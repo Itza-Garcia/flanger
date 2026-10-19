@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flanger</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #ffffff;
+            color: #222;
+            margin: 0;
+            padding: 16px;
+        }
+        h1 { font-size: 1.4rem; margin: 0 0 12px; }
+        #status { margin: 12px 0; color: #555; }
+        button {
+            font-size: 1rem;
+            padding: 8px 16px;
+            border: 1px solid #333;
+            border-radius: 6px;
+            background: #f2f2f2;
+            cursor: pointer;
+        }
+        button:hover { background: #e4e4e4; }
+        #start { font-size: 1.2rem; padding: 12px 28px; }
+        #controls { display: none; max-width: 420px; }
+        .row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 10px 0;
+        }
+        .row label { flex: 1; }
+        .row input[readonly] { background: #f2f2f2; color: #555; }
+        .row input[type=checkbox] { width: 22px; height: 22px; }
+        .row input { width: 110px; font-size: 1rem; padding: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Flanger</h1>
+
+    <div id="status">Loading ...</div>
+    <button id="start" style="display:none">Start</button>
+
+    <div id="controls">
+        <!-- Rename the labels below to match what each control does in your patch -->
+        <div class="row">
+            <label>Play sample (bang)</label>
+            <button id="bang">Play</button>
+        </div>
+        <div class="row">
+            <label for="n7">FeedForward Gain (0.-1.)</label>
+            <input type="number" id="n7" data-node="n_0_6" min="0" max="1" step="0.01" value="0">
+        </div>
+        <div class="row">
+            <label for="n8">Set Maximum Delay Time (Default 50000ms)</label>
+            <input type="number" id="n8" data-node="n_0_7" step="any">
+        </div>
+        <div class="row">
+            <label for="n9">Delay Time (ms, moved by the LFO)</label>
+            <input type="number" id="n9" data-node="n_0_8" readonly tabindex="-1">
+        </div>
+        <div class="row">
+            <label for="n12">Blend Gain (0.-1.)</label>
+            <input type="number" id="n12" data-node="n_0_11" min="0" max="1" step="0.01" value="0">
+        </div>
+        <div class="row">
+            <label for="n20">Feedback Gain (0.-0.99)</label>
+            <input type="number" id="n20" data-node="n_0_20" min="0" max="0.99" step="0.01" value="0">
+        </div>
+        <div class="row">
+            <label for="n23">LFO Frequency (0.01-0.1 Hz)</label>
+            <input type="number" id="n23" data-node="n_0_23" min="0.01" max="0.1" step="0.005" value="0.025">
+        </div>
+        <div class="row">
+            <label for="n27">LFO On/Off</label>
+            <input type="checkbox" id="n27" checked>
+        </div>
+    </div>
+
+    <script src="webpd-runtime.js"></script>
+    <script>
+        const statusDiv = document.querySelector('#status')
+        const startButton = document.querySelector('#start')
+        const controlsDiv = document.querySelector('#controls')
+        const audioContext = new AudioContext()
+
+        let patch = null
+        let stream = null
+        let webpdNode = null
+
+        const initApp = async () => {
+            await WebPdRuntime.initialize(audioContext)
+            const response = await fetch('patch.js')
+            patch = await response.text()
+            statusDiv.textContent = 'Click Start to begin.'
+            startButton.style.display = 'inline-block'
+        }
+
+        const startApp = async () => {
+            if (audioContext.state === 'suspended') {
+                await audioContext.resume()
+            }
+
+            webpdNode = await WebPdRuntime.run(
+                audioContext,
+                patch,
+                WebPdRuntime.defaultSettingsForRun('./patch.js', receiveMsgFromWebPd),
+            )
+            webpdNode.connect(audioContext.destination)
+
+            startButton.style.display = 'none'
+            statusDiv.style.display = 'none'
+            controlsDiv.style.display = 'block'
+        }
+
+        startButton.onclick = startApp
+
+        initApp().catch((err) => {
+            statusDiv.textContent = 'Could not load the patch: ' + err
+            console.error(err)
+        })
+
+        const sendMsgToWebPd = (nodeId, portletId, message) => {
+            if (!webpdNode) return
+            webpdNode.port.postMessage({
+                type: 'io:messageReceiver',
+                payload: { nodeId, portletId, message },
+            })
+        }
+
+        // Bang (plays the sample)
+        document.querySelector('#bang').onclick = () => sendMsgToWebPd('n_0_2', '0', ['bang'])
+
+        // Toggle: turns the LFO on (1) or off (0)
+        document.querySelector('#n27').onchange = (e) => sendMsgToWebPd('n_0_27', '0', [e.target.checked ? 1 : 0])
+
+        // Number boxes: send the value whenever it changes
+        document.querySelectorAll('input[data-node]').forEach((input) => {
+            input.addEventListener('change', () => {
+                if (input.readOnly) return
+                let value = parseFloat(input.value)
+                if (isNaN(value)) return
+                if (input.min !== '') value = Math.max(value, parseFloat(input.min))
+                if (input.max !== '') value = Math.min(value, parseFloat(input.max))
+                input.value = value
+                sendMsgToWebPd(input.dataset.node, '0', [value])
+            })
+        })
+
+        // Messages coming back from the patch update the matching number box
+        const receiveMsgFromWebPd = (nodeId, portletId, message) => {
+            const input = document.querySelector(`input[data-node="${nodeId}"]`)
+            if (input && typeof message[0] === 'number') {
+                input.value = input.readOnly ? message[0].toFixed(2) : message[0]
+            }
+        }
+    </script>
+</body>
+</html>
