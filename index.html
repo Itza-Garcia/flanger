@@ -1,162 +1,287 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flanger</title>
-    <style>
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            background: #ffffff;
-            color: #222;
-            margin: 0;
-            padding: 16px;
-        }
-        h1 { font-size: 1.4rem; margin: 0 0 12px; }
-        #status { margin: 12px 0; color: #555; }
-        button {
-            font-size: 1rem;
-            padding: 8px 16px;
-            border: 1px solid #333;
-            border-radius: 6px;
-            background: #f2f2f2;
-            cursor: pointer;
-        }
-        button:hover { background: #e4e4e4; }
-        #start { font-size: 1.2rem; padding: 12px 28px; }
-        #controls { display: none; max-width: 420px; }
-        .row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            margin: 10px 0;
-        }
-        .row label { flex: 1; }
-        .row input[readonly] { background: #f2f2f2; color: #555; }
-        .row input[type=checkbox] { width: 22px; height: 22px; }
-        .row input { width: 110px; font-size: 1rem; padding: 4px; }
-    </style>
-</head>
-<body>
-    <h1>Flanger</h1>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta http-equiv="X-UA-Compatible" content="ie=edge">
+        <title>Flanger</title>
+        <style>
+            :root {
+                --bg: #f6f5f2;
+                --panel: #ffffff;
+                --text: #1d1d1f;
+                --muted: #6b6b70;
+                --accent: #2f6fdb;
+                --border: #dddad3;
+                --track: #e7e4dd;
+            }
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --bg: #17181a;
+                    --panel: #222326;
+                    --text: #f1f1f2;
+                    --muted: #a0a0a6;
+                    --accent: #6b9cf0;
+                    --border: #35363a;
+                    --track: #35363a;
+                }
+            }
+            * { box-sizing: border-box; }
+            body {
+                margin: 0;
+                padding: 32px 16px;
+                background: var(--bg);
+                color: var(--text);
+                font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+                display: flex;
+                justify-content: center;
+            }
+            main { width: 100%; max-width: 520px; }
+            h1 { margin: 0 0 4px; font-size: 1.6rem; }
+            .subtitle { margin: 0 0 24px; color: var(--muted); }
+            .panel {
+                background: var(--panel);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                padding: 24px;
+            }
+            button {
+                font: inherit;
+                font-weight: 600;
+                border: none;
+                border-radius: 8px;
+                padding: 12px 20px;
+                background: var(--accent);
+                color: #fff;
+                cursor: pointer;
+                width: 100%;
+            }
+            button:disabled { opacity: 0.5; cursor: default; }
+            #controls { display: none; }
+            #play { margin-bottom: 24px; }
+            .param { margin-bottom: 20px; }
+            .param:last-child { margin-bottom: 0; }
+            .param-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: baseline;
+                margin-bottom: 6px;
+            }
+            .param label { font-weight: 600; }
+            .param .hint { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+            output {
+                font-variant-numeric: tabular-nums;
+                min-width: 70px;
+                text-align: right;
+            }
+            input[type=range] { width: 100%; accent-color: var(--accent); }
+            .meter {
+                height: 8px;
+                border-radius: 4px;
+                background: var(--track);
+                overflow: hidden;
+            }
+            .meter > div {
+                height: 100%;
+                width: 50%;
+                background: var(--accent);
+                opacity: 0.6;
+            }
+            .switch-row {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .switch-row input { width: 22px; height: 22px; accent-color: var(--accent); }
+            .divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+        </style>
+    </head>
+    <body>
+        <main>
+            <h1>Flanger</h1>
+            <p class="subtitle">A feedback delay whose delay time is swept by an LFO between 0 and 20 ms</p>
 
-    <div id="status">Loading ...</div>
-    <button id="start" style="display:none">Start</button>
+            <div class="panel">
+                <button id="start" disabled>Loading…</button>
 
-    <div id="controls">
-        <!-- Rename the labels below to match what each control does in your patch -->
-        <div class="row">
-            <label>Play sample (bang)</label>
-            <button id="bang">Play</button>
-        </div>
-        <div class="row">
-            <label for="n7">FeedForward Gain (between 0 and 1 only)</label>
-            <input type="number" id="n7" data-node="n_0_6" min="0" max="1" step="0.01" value="0">
-        </div>
-        <div class="row">
-            <label for="n8">Set Maximum Delay Time (Default 50000ms)</label>
-            <input type="number" id="n8" data-node="n_0_7" step="any">
-        </div>
-        <div class="row">
-            <label for="n9">Delay Time (ms, moved by the LFO)</label>
-            <input type="number" id="n9" data-node="n_0_8" readonly tabindex="-1">
-        </div>
-        <div class="row">
-            <label for="n12">Blend Gain (between 0 and 1 only)</label>
-            <input type="number" id="n12" data-node="n_0_11" min="0" max="1" step="0.01" value="0">
-        </div>
-        <div class="row">
-            <label for="n20">Feedback Gain (between 0 and 0.99 only)</label>
-            <input type="number" id="n20" data-node="n_0_20" min="0" max="0.99" step="0.01" value="0">
-        </div>
-        <div class="row">
-            <label for="n23">LFO Frequency (0.01 to 0.1 Hz)</label>
-            <input type="number" id="n23" data-node="n_0_23" min="0.01" max="0.1" step="0.005" value="0.025">
-        </div>
-        <div class="row">
-            <label for="n27">LFO On/Off</label>
-            <input type="checkbox" id="n27" checked>
-        </div>
-    </div>
+                <div id="controls">
+                    <button id="play">▶ Play</button>
 
-    <script src="webpd-runtime.js"></script>
-    <script>
-        const statusDiv = document.querySelector('#status')
-        const startButton = document.querySelector('#start')
-        const controlsDiv = document.querySelector('#controls')
-        const audioContext = new AudioContext()
+                    <div class="param switch-row">
+                        <label for="lfoOn">LFO on</label>
+                        <input type="checkbox" id="lfoOn" checked>
+                    </div>
 
-        let patch = null
-        let stream = null
-        let webpdNode = null
+                    <div class="param">
+                        <div class="param-head">
+                            <label for="lfoFreq">LFO frequency</label>
+                            <output id="lfoFreqOut"></output>
+                        </div>
+                        <input type="range" id="lfoFreq">
+                        <div class="hint">How fast the delay time sweeps, 0.01 – 0.1 Hz</div>
+                    </div>
 
-        const initApp = async () => {
-            await WebPdRuntime.initialize(audioContext)
-            const response = await fetch('patch.js')
-            patch = await response.text()
-            statusDiv.textContent = 'Click Start to begin.'
-            startButton.style.display = 'inline-block'
-        }
+                    <div class="param">
+                        <div class="param-head">
+                            <span style="font-weight:600">Delay time (moved by the LFO)</span>
+                            <output id="delayOut">–</output>
+                        </div>
+                        <div class="meter"><div id="delayBar"></div></div>
+                        <div class="hint">0 – 20 ms</div>
+                    </div>
 
-        const startApp = async () => {
-            if (audioContext.state === 'suspended') {
-                await audioContext.resume()
+                    <hr class="divider">
+
+                    <div class="param">
+                        <div class="param-head">
+                            <label for="feedforward">Feedforward gain</label>
+                            <output id="feedforwardOut"></output>
+                        </div>
+                        <input type="range" id="feedforward">
+                        <div class="hint">Level of the delayed signal, 0 – 1</div>
+                    </div>
+
+                    <div class="param">
+                        <div class="param-head">
+                            <label for="blend">Blend gain</label>
+                            <output id="blendOut"></output>
+                        </div>
+                        <input type="range" id="blend">
+                        <div class="hint">Level of the dry signal, 0 – 1</div>
+                    </div>
+
+                    <div class="param">
+                        <div class="param-head">
+                            <label for="feedback">Feedback gain</label>
+                            <output id="feedbackOut"></output>
+                        </div>
+                        <input type="range" id="feedback">
+                        <div class="hint">How much of the delayed signal is fed back in, 0 – 1</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <script src="webpd-runtime.js"></script>
+        <script>
+            // ------------- PARAMETERS
+            // Each slider sends its value to a number box inside the Pd patch.
+            // min / max lock the range students see; value is the preset.
+            // scale multiplies the slider value before it reaches the patch.
+            const PARAMS = [
+                { id: 'lfoFreq',     nodeId: 'n_0_23', min: 0.01, max: 0.1, step: 0.005, value: 0.025, scale: 1,   decimals: 3, unit: ' Hz' },
+                // Gains show 0–1 but are scaled by 0.5, so the patch only ever gets 0–0.5.
+                // Feedback at 0.5 or less also keeps the sound decaying (never runaway).
+                { id: 'feedforward', nodeId: 'n_0_6',  min: 0,    max: 1,   step: 0.01,  value: 0.5,   scale: 0.5, decimals: 2, unit: '' },
+                { id: 'blend',       nodeId: 'n_0_11', min: 0,    max: 1,   step: 0.01,  value: 0.5,   scale: 0.5, decimals: 2, unit: '' },
+                { id: 'feedback',    nodeId: 'n_0_20', min: 0,    max: 1,   step: 0.01,  value: 0.5,   scale: 0.5, decimals: 2, unit: '' },
+            ]
+            const PLAY_NODE = 'n_0_2'        // bang that plays pulse_arpeggio.wav
+            const LFO_TOGGLE_NODE = 'n_0_27' // toggle that starts/stops the LFO
+            const DELAY_NODE = 'n_0_8'       // delay time, written by the LFO (0–20 ms)
+            const DELAY_MAX_MS = 20
+
+            // Note: the maximum delay time is fixed at 5000 ms inside the patch
+            // (delwrite~ buffer), so there is no control for it here.
+
+            // ------------- WEB PAGE INITIALIZATION
+            const startButton = document.querySelector('#start')
+            const controls = document.querySelector('#controls')
+            const playButton = document.querySelector('#play')
+            const lfoOn = document.querySelector('#lfoOn')
+            const delayOut = document.querySelector('#delayOut')
+            const delayBar = document.querySelector('#delayBar')
+            const audioContext = new AudioContext()
+
+            let patch = null
+            let webpdNode = null
+
+            const sendMsgToWebPd = (nodeId, portletId, message) => {
+                if (!webpdNode) return
+                webpdNode.port.postMessage({
+                    type: 'io:messageReceiver',
+                    payload: { nodeId, portletId, message },
+                })
             }
 
-            webpdNode = await WebPdRuntime.run(
-                audioContext,
-                patch,
-                WebPdRuntime.defaultSettingsForRun('./patch.js', receiveMsgFromWebPd),
-            )
-            webpdNode.connect(audioContext.destination)
+            const format = (p, v) => Number(v).toFixed(p.decimals) + p.unit
 
-            startButton.style.display = 'none'
-            statusDiv.style.display = 'none'
-            controlsDiv.style.display = 'block'
-        }
-
-        startButton.onclick = startApp
-
-        initApp().catch((err) => {
-            statusDiv.textContent = 'Could not load the patch: ' + err
-            console.error(err)
-        })
-
-        const sendMsgToWebPd = (nodeId, portletId, message) => {
-            if (!webpdNode) return
-            webpdNode.port.postMessage({
-                type: 'io:messageReceiver',
-                payload: { nodeId, portletId, message },
+            // Build sliders from PARAMS
+            PARAMS.forEach((p) => {
+                const slider = document.getElementById(p.id)
+                const out = document.getElementById(p.id + 'Out')
+                slider.min = p.min
+                slider.max = p.max
+                slider.step = p.step
+                slider.value = p.value
+                out.textContent = format(p, p.value)
+                slider.addEventListener('input', () => {
+                    // Clamp just in case, so nothing outside the range reaches the patch
+                    const v = Math.min(p.max, Math.max(p.min, parseFloat(slider.value)))
+                    out.textContent = format(p, v)
+                    sendMsgToWebPd(p.nodeId, '0', [v * p.scale])
+                })
             })
-        }
 
-        // Bang (plays the sample)
-        document.querySelector('#bang').onclick = () => sendMsgToWebPd('n_0_2', '0', ['bang'])
-
-        // Toggle: turns the LFO on (1) or off (0)
-        document.querySelector('#n27').onchange = (e) => sendMsgToWebPd('n_0_27', '0', [e.target.checked ? 1 : 0])
-
-        // Number boxes: send the value whenever it changes
-        document.querySelectorAll('input[data-node]').forEach((input) => {
-            input.addEventListener('change', () => {
-                if (input.readOnly) return
-                let value = parseFloat(input.value)
-                if (isNaN(value)) return
-                if (input.min !== '') value = Math.max(value, parseFloat(input.min))
-                if (input.max !== '') value = Math.min(value, parseFloat(input.max))
-                input.value = value
-                sendMsgToWebPd(input.dataset.node, '0', [value])
+            lfoOn.addEventListener('change', () => {
+                sendMsgToWebPd(LFO_TOGGLE_NODE, '0', [lfoOn.checked ? 1 : 0])
             })
-        })
 
-        // Messages coming back from the patch update the matching number box
-        const receiveMsgFromWebPd = (nodeId, portletId, message) => {
-            const input = document.querySelector(`input[data-node="${nodeId}"]`)
-            if (input && typeof message[0] === 'number') {
-                input.value = input.readOnly ? message[0].toFixed(2) : message[0]
+            // Sends every control's current value to the patch
+            const sendAllParams = () => {
+                PARAMS.forEach((p) => {
+                    const v = parseFloat(document.getElementById(p.id).value)
+                    sendMsgToWebPd(p.nodeId, '0', [v * p.scale])
+                })
+                sendMsgToWebPd(LFO_TOGGLE_NODE, '0', [lfoOn.checked ? 1 : 0])
             }
-        }
-    </script>
-</body>
+
+            const initApp = async () => {
+                await WebPdRuntime.initialize(audioContext)
+                const response = await fetch('patch.js')
+                patch = await response.text()
+
+                startButton.textContent = 'Start audio'
+                startButton.disabled = false
+            }
+
+            const startApp = async () => {
+                if (audioContext.state === 'suspended') {
+                    await audioContext.resume()
+                }
+
+                webpdNode = await WebPdRuntime.run(
+                    audioContext,
+                    patch,
+                    WebPdRuntime.defaultSettingsForRun('./patch.js', receiveMsgFromWebPd),
+                )
+                webpdNode.connect(audioContext.destination)
+
+                // The patch only becomes ready once the first audio block runs,
+                // so wait a moment before sending the presets.
+                setTimeout(sendAllParams, 300)
+
+                startButton.style.display = 'none'
+                controls.style.display = 'block'
+            }
+
+            startButton.onclick = startApp
+            playButton.onclick = () => {
+                // Re-send the control values first so the patch always matches what students see
+                sendAllParams()
+                sendMsgToWebPd(PLAY_NODE, '0', ['bang'])
+            }
+
+            initApp().then(() => console.log('App initialized'))
+
+            // Messages coming back from the patch: show the LFO-driven delay time
+            const receiveMsgFromWebPd = (nodeId, portletId, message) => {
+                if (nodeId === DELAY_NODE && typeof message[0] === 'number') {
+                    const ms = message[0]
+                    delayOut.textContent = ms.toFixed(2) + ' ms'
+                    delayBar.style.width = Math.min(100, Math.max(0, ms / DELAY_MAX_MS * 100)) + '%'
+                }
+            }
+        </script>
+    </body>
 </html>
